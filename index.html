@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Progressive Filtering Demo</title>
+    <meta charset="UTF-8">
+
+  <style>
+      table, th , td  {
+        border: 1px solid grey;
+        border-collapse: collapse;
+        padding: 5px;
+      }
+      table tr:nth-child(odd) {
+        background-color: #f1f1f1;
+      }
+      table tr:nth-child(even) {
+        background-color: #ffffff;
+      }
+  </style>
+
+    <!-- STYLE -->
+    <link rel="stylesheet" type="text/css" href="//dc-js.github.io/dc.js/css/dc.css">
+    <link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.1.1/css/bootstrap.css"/>
+    <!-- JS CDN MODULES -->
+    <script src= "http://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/d3/3.4.4/d3.min.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/crossfilter/1.3.7/crossfilter.min.js"></script>
+    <script type="text/javascript" src="//dc-js.github.io/dc.js/js/dc.js"></script>
+    <!-- JS LOCAL MODULES -->
+  	<script type="text/javascript" src="colorbrewer.js"></script>
+    <!-- DATA -->
+    <script type="text/javascript" src="property.json"></script>
+    <script type="text/javascript" src="data.json"></script>
+
+
+</head>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<body ng-app="myApp" ng-controller="graphFilterCtrl">
+
+<div class="container-fluid">
+<div class="span12">
+<h1> Demo: Visual Filtering </h1>
+  <br />
+  <br />
+
+
+
+  <div class="row-fluid">
+
+    <div class="col-sm-3">
+      <!--Sidebar content-->
+    <a href ng-click="btnBldg = !btnBldg" class="btn btn-primary btn-sm">Building</a>
+      <div class="container-fluid" ng-show="btnBldg">
+            <br />
+            <br />
+        <div id='histNewTot' class='dc-chart'><span><b>New Total Value</b></span></div>
+        <div id='chartRow' class='dc-chart'><span><b>Use Type</b></span></div>
+      </div>
+            <br />
+            <br />
+    <a href ng-click="btnProp = !btnProp" class="btn btn-primary btn-sm">Property</a>
+      <div class="container-fluid" ng-show="btnProp">
+            <br />
+            <br />
+        <div id='histCurSz' class='dc-chart'><span><b>Current Size</b></span></div>
+      </div>
+            <br />
+            <br />
+    </div>
+
+    <div class="col-sm-7" >
+    <table id="dc-data-table" width="100%" >
+      <thead>
+      <tr class="header">
+        <th>Last Sale Date</th>
+        <th>ID</th>
+        <th>Property Address</th>
+        <th>Value</th>
+      </tr>
+      </thead>
+    </table>
+    </div>
+
+
+    </div>
+
+
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+
+var myApp = angular.module('myApp', [])
+
+.controller('graphFilterCtrl', function($scope) {
+
+  $scope.btnBldg = false;
+  $scope.btnProp = false;
+
+
+
+
+var histNewTot = dc.barChart('#histNewTot'), 
+    histCurSz = dc.barChart('#histCurSz'), 
+    rowUseOldTot = dc.rowChart('#chartRow');
+
+var parseDateFormat = d3.time.format('%b %e, %Y %-I:%M:%S %p').parse;        //('%b %e, %Y %-I:%M:%S %p')saledate: "Aug 17, 2011 8:00:00 PM"        ("%m/%d/%Y %-I:%M:%S %p")12/31/1900  7:00:00 PM
+ 
+property.forEach(function(d){
+     d.saledate = parseDateFormat(d.saledate);
+     d.year = d.saledate.getFullYear();                  // pre-calculate month for better performance
+
+     d.id = d.id;
+     d.propertyAddress = d.propertyAddress;
+     d.propertyCity = d.propertyCity;
+
+     d.currentUse = d.currentUse;                    //"Condo Low-Rise"
+     d.currentUseCalc = d.currentUseCalc;            //"Condo / Co-op"
+     d.currentUseCategory = d.currentUseCategory;    //"Residential"
+     d.enterpriseZone = d.enterpriseZone;            //"10-20% Poverty Level"
+
+     d.newImprValue = +d.newImprValue;
+     d.newLandValue = +d.newLandValue;
+     d.newTotalValue = +d.newTotalValue;
+
+     d.oldImprValue = +d.oldImprValue;
+     d.oldLandValue = +d.oldLandValue
+     d.oldTotalValue = +d.oldTotalValue;
+
+     d.currentSize = +d.currentSize;
+     d.numBedrooms = +d.numBedrooms;
+     d.numRooms = +d.numRooms;
+     d.numUnits = +d.numUnits;
+
+ });
+
+
+
+ //### Create Crossfilter Dimensions and Groups
+ //See the [crossfilter API](https://github.com/square/crossfilter/wiki/API-Reference) for reference.
+var ndx = crossfilter(property);
+
+var dateDim = ndx.dimension(function(d) {return d.saledate;});
+
+var dimNewTotal  = ndx.dimension(function(d) {return (Math.floor(d.newTotalValue/1000));}),
+    numNewTot   = dimNewTotal.group().reduceCount();
+
+var dimCurrentSize  = ndx.dimension(function(d) {return Math.floor(d.currentSize);}),
+    numCurSz   = dimCurrentSize.group().reduceCount();
+
+var dimUse  = ndx.dimension(function(d) {return d.currentUse;}),
+    ordUseOldTot = dimUse.group().reduceSum(function(d) {return Math.floor(d.oldTotalValue/100000);});
+
+
+
+
+
+histNewTot
+    .width(200).height(125)
+    .dimension(dimNewTotal)
+    .group(numNewTot)
+    .centerBar(true)
+    .round(dc.round.floor)
+    .alwaysUseRounding(true)
+    .x(d3.scale.linear().domain([400,500]))
+    .elasticY(true);
+
+//histNewTot.xAxis().tickFormat(function(d) {return d*10}); // convert back to base unit
+//histNewTot.yAxis().ticks(2);
+
+histCurSz
+    .width(200).height(125)
+    .dimension(dimCurrentSize)
+    .group(numCurSz)
+    .x(d3.scale.linear().domain([700,800]))
+    .elasticY(true);
+
+rowUseOldTot
+    .width(200).height(125)
+    .dimension(dimUse)
+    .group(ordUseOldTot)
+    .elasticX(true);
+
+var datatable   = dc.dataTable("#dc-data-table");
+datatable
+    .dimension(dateDim)
+    .group(function(d) {return d.year;})
+    .sortBy(function (d) { return d.year; })
+    .order(d3.descending)
+    .size(20)
+    // dynamic columns creation using an array of closures
+    .columns([
+        function(d) {return d.saledate.toDateString().slice(0,10);},
+        function(d) {return d.id;},
+        function(d) {return d.propertyAddress;},
+        function(d) {return d.newTotalValue;}       
+    ]);
+
+
+
+dc.renderAll();
+
+
+
+});
+
+
+
+
+
+/*
+// ORDINAL COLUMNS
+currentExpUse: "Condo"
+currentGrade: null
+currentGradeDesc: null
+currentSize: 770
+currentUse: "Condo Low-Rise"
+currentUseCalc: "Condo / Co-op"
+currentUseCategory: "Residential"
+currentUseName: "Condo Low-Rise"
+currentUseType: "Residential"
+currentUseVis: "Condo / Co-op"
+enterpriseZone: "10-20% Poverty Level"
+metrobusClosest: "L2"
+
+
+
+
+// NUMERIC COLUMNS
+cama.lotSize: 465
+cama.numBathrooms: 1
+cama.numBedrooms: 1
+cama.numBldgs: 1
+cama.numFireplaces: 1
+cama.numHfBathrooms: 0
+cama.numKitchens: null
+cama.numRooms: 3
+cama.numUnits: 1
+
+distances.bikeshareDist: 107.015994139
+distances.bikeshareLoc: "18th & R St NW"
+distances.groceryDist: 331.708188079
+distances.libraryDist: 1145.211101828
+distances.metroDist: 199.730981973
+distances.metrobusDist: 124.146144915
+distances.retailDist: 138.592950841
+distances.zipcarDist: 646.694859118
+
+metroDistance: 199.73
+metrobusDistance: 124.15
+
+saledate
+
+newImprValue: 323460
+newLandValue: 138630
+newTotalValue: 462090
+nonprofitTaxAbate: null
+numBedrooms: 1
+numRooms: 3
+numUnits: 1
+oldImprValue: 307550
+oldLandValue: 131800
+oldTotalValue: 439350
+
+pop2012: 233
+pop2018: 334.1666666667
+
+priorTaxYear 
+taxYear
+
+
+*/
+
+</script>
+
+
+
+</body>
+
+
+</html>
